@@ -40,40 +40,139 @@ echo -e "${GREEN}2. 安装 pm2${NC}"
 echo -e "${GREEN}3. 创建项目目录${NC}"
 mkdir -p /var/www/food-manage
 
-# 4. 复制项目文件
-echo -e "${GREEN}4. 复制项目文件${NC}"
-cp -r * /var/www/food-manage/
+# 4. 创建 package.json
+echo -e "${GREEN}4. 创建 package.json${NC}"
+cat > /var/www/food-manage/package.json << EOL
+{
+  "name": "food-manage",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@types/node": "^20.0.0",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "autoprefixer": "^10.4.0",
+    "lucide-react": "^0.294.0",
+    "next": "14.0.3",
+    "postcss": "^8.4.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "tailwindcss": "^3.3.0",
+    "typescript": "^5.0.0"
+  }
+}
+EOL
 
-# 5. 安装依赖和构建
-echo -e "${GREEN}5. 安装依赖和构建${NC}"
+# 5. 复制项目文件
+echo -e "${GREEN}5. 复制项目文件${NC}"
+cp -r app components types utils /var/www/food-manage/
+
+# 6. 创建必要的配置文件
+echo -e "${GREEN}6. 创建配置文件${NC}"
+cat > /var/www/food-manage/next.config.js << EOL
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  reactStrictMode: true,
+  output: 'standalone'
+}
+module.exports = nextConfig
+EOL
+
+cat > /var/www/food-manage/tsconfig.json << EOL
+{
+  "compilerOptions": {
+    "target": "es5",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "preserve",
+    "incremental": true,
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "paths": {
+      "@/*": ["./*"]
+    }
+  },
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+  "exclude": ["node_modules"]
+}
+EOL
+
+cat > /var/www/food-manage/postcss.config.js << EOL
+module.exports = {
+  plugins: {
+    tailwindcss: {},
+    autoprefixer: {},
+  },
+}
+EOL
+
+cat > /var/www/food-manage/tailwind.config.js << EOL
+/** @type {import('tailwindcss').Config} */
+module.exports = {
+  content: [
+    './pages/**/*.{js,ts,jsx,tsx,mdx}',
+    './components/**/*.{js,ts,jsx,tsx,mdx}',
+    './app/**/*.{js,ts,jsx,tsx,mdx}',
+  ],
+  theme: {
+    extend: {},
+  },
+  plugins: [],
+}
+EOL
+
+# 7. 安装依赖和构建
+echo -e "${GREEN}7. 安装依赖和构建${NC}"
 cd /var/www/food-manage
 . $NVM_DIR/nvm.sh && npm install
 . $NVM_DIR/nvm.sh && npm run build
 
-# 6. 配置 Caddy
-echo -e "${GREEN}6. 配置 Caddy${NC}"
+# 8. 配置 Caddy
+echo -e "${GREEN}8. 配置 Caddy${NC}"
 mkdir -p /etc/caddy/Caddyfile.d
-sudo tee /etc/caddy/Caddyfile.d/food.conf > /dev/null << EOL
+cat > /etc/caddy/Caddyfile << EOL
+import /etc/caddy/Caddyfile.d/*
+EOL
+
+cat > /etc/caddy/Caddyfile.d/food.conf << EOL
 f.076095598.xyz {
     tls /etc/ssl/web.crt /etc/ssl/web.key
     reverse_proxy localhost:3000
 }
 EOL
 
-# 7. 重载 Caddy 配置
-echo -e "${GREEN}7. 重载 Caddy 配置${NC}"
+# 9. 重载 Caddy 配置
+echo -e "${GREEN}9. 重载 Caddy 配置${NC}"
 systemctl reload caddy
 
-# 8. 使用 pm2 启动服务
-echo -e "${GREEN}8. 启动服务${NC}"
+# 10. 使用 pm2 启动服务
+echo -e "${GREEN}10. 启动服务${NC}"
+cd /var/www/food-manage
 . $NVM_DIR/nvm.sh && pm2 delete food-manage 2>/dev/null || true
 . $NVM_DIR/nvm.sh && pm2 start npm --name "food-manage" -- start
 . $NVM_DIR/nvm.sh && pm2 save
 
-# 9. 设置开机自启
-echo -e "${GREEN}9. 设置开机自启${NC}"
-. $NVM_DIR/nvm.sh && pm2 startup debian
-env PATH=$PATH:/root/.nvm/versions/node/v18/bin /root/.nvm/versions/node/v18/lib/node_modules/pm2/bin/pm2 startup debian -u root --hp /root
+# 11. 设置开机自启
+echo -e "${GREEN}11. 设置开机自启${NC}"
+. $NVM_DIR/nvm.sh && pm2 startup systemd
+. $NVM_DIR/nvm.sh && pm2 save
 
 echo -e "${GREEN}部署完成！${NC}"
 echo -e "您现在可以通过 https://f.076095598.xyz 访问食材管理系统" 
