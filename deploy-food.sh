@@ -52,12 +52,41 @@ debug_info() {
 create_file() {
     local file="$1"
     local content="$2"
+    local backup=false
     
     echo "创建文件: $file"
-    mkdir -p "$(dirname "$file")"  # 确保父目录存在
-    echo "$content" > "$file"
+    
+    # 如果是系统配置文件，先创建备份
+    if [[ $file == /etc/* ]]; then
+        backup=true
+        if [ -f "$file" ]; then
+            echo "创建备份: ${file}.bak"
+            cp "$file" "${file}.bak" || handle_error "创建备份失败: $file"
+        fi
+    fi
+    
+    # 确保父目录存在并设置正确的权限
+    mkdir -p "$(dirname "$file")" || handle_error "创建目录失败: $(dirname "$file")"
+    
+    # 写入文件内容
+    echo "$content" > "$file" || handle_error "写入文件失败: $file"
     sync  # 同步文件系统
+    
+    # 设置适当的权限
+    if [[ $file == /etc/* ]]; then
+        chmod 644 "$file" || handle_error "设置权限失败: $file"
+    else
+        chmod 664 "$file" || handle_error "设置权限失败: $file"
+    fi
+    
+    # 验证文件
     check_file "$file"
+    
+    # 如果是备份文件，打印对比信息
+    if [ "$backup" = true ] && [ -f "${file}.bak" ]; then
+        echo "文件差异对比:"
+        diff -u "${file}.bak" "$file" || true
+    fi
 }
 
 echo -e "${GREEN}开始部署食材管理系统...${NC}"
@@ -270,11 +299,21 @@ debug_info "项目构建完成"
 # 9. 配置 Caddy
 echo -e "${GREEN}9. 配置 Caddy${NC}"
 
+# 检查 Caddy 安装
+if ! command -v caddy &> /dev/null; then
+    handle_error "Caddy 未安装"
+fi
+
 # 创建 Caddyfile
 create_file "/etc/caddy/Caddyfile" 'f.076095598.xyz {
     tls /etc/ssl/web.crt /etc/ssl/web.key
     reverse_proxy localhost:3000
 }'
+
+# 检查 SSL 证书
+if [ ! -f "/etc/ssl/web.crt" ] || [ ! -f "/etc/ssl/web.key" ]; then
+    handle_error "SSL 证书文件不存在"
+fi
 
 # 验证 Caddy 配置
 echo "验证 Caddy 配置..."
@@ -283,6 +322,14 @@ caddy validate --config /etc/caddy/Caddyfile || handle_error "Caddy 配置验证
 # 10. 重载 Caddy 配置
 echo -e "${GREEN}10. 重载 Caddy 配置${NC}"
 systemctl reload caddy || handle_error "Caddy 重载失败"
+
+# 等待服务启动
+echo "等待 Caddy 服务启动..."
+sleep 2
+if ! systemctl is-active --quiet caddy; then
+    systemctl status caddy
+    handle_error "Caddy 服务未能正常启动"
+fi
 
 # 11. 使用 pm2 启动服务
 echo -e "${GREEN}11. 启动服务${NC}"
