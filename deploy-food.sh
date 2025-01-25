@@ -102,6 +102,28 @@ mkdir -p app components types utils || handle_error "创建项目结构失败"
 
 # 6. 创建基本组件和页面
 echo -e "${GREEN}6. 创建基本组件和页面${NC}"
+cat > app/layout.tsx << EOL
+import './globals.css'
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html lang="zh">
+      <body>{children}</body>
+    </html>
+  )
+}
+EOL
+
+cat > app/globals.css << EOL
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+EOL
+
 cat > app/page.tsx << EOL
 import Link from "next/link"
 
@@ -237,13 +259,14 @@ systemctl reload caddy || handle_error "Caddy 重载失败"
 
 # 11. 使用 pm2 启动服务
 echo -e "${GREEN}11. 启动服务${NC}"
+cd /var/www/food-manage || handle_error "切换到项目目录失败"
 pm2 delete food-manage 2>/dev/null || true
 pm2 start npm --name "food-manage" -- start || handle_error "启动服务失败"
 pm2 save || handle_error "保存 pm2 配置失败"
 
 # 12. 设置开机自启
 echo -e "${GREEN}12. 设置开机自启${NC}"
-pm2 startup systemd || handle_error "设置开机自启失败"
+pm2 startup || true
 pm2 save || handle_error "保存 pm2 配置失败"
 
 echo -e "${GREEN}部署完成！${NC}"
