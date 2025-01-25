@@ -8,7 +8,22 @@ NC='\033[0m'
 # 错误处理函数
 handle_error() {
     echo -e "${RED}错误: $1${NC}"
+    echo "当前目录: $(pwd)"
+    echo "目录内容:"
+    ls -la
     exit 1
+}
+
+# 检查文件是否存在
+check_file() {
+    if [ ! -f "$1" ]; then
+        handle_error "文件不存在: $1"
+    else
+        echo "文件存在: $1"
+        echo "文件内容:"
+        cat "$1"
+        echo "------------------------"
+    fi
 }
 
 echo -e "${GREEN}开始部署食材管理系统...${NC}"
@@ -21,12 +36,7 @@ export NVM_DIR="/root/.nvm"
 if [ ! -d "$NVM_DIR" ]; then
     echo "安装 nvm..."
     curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
-    source $NVM_DIR/nvm.sh
-    source $NVM_DIR/bash_completion
 fi
-
-# 重新加载 shell 配置
-source ~/.bashrc
 
 # 加载 nvm
 export NVM_DIR="$HOME/.nvm"
@@ -53,10 +63,11 @@ npm install -g pm2 || handle_error "pm2 安装失败"
 echo -e "${GREEN}3. 创建项目目录${NC}"
 rm -rf /var/www/food-manage
 mkdir -p /var/www/food-manage || handle_error "创建项目目录失败"
+cd /var/www/food-manage || handle_error "切换到项目目录失败"
 
 # 4. 创建 package.json
 echo -e "${GREEN}4. 创建 package.json${NC}"
-cat > /var/www/food-manage/package.json << EOL
+cat > package.json << EOL
 {
   "name": "food-manage",
   "version": "0.1.0",
@@ -83,26 +94,53 @@ cat > /var/www/food-manage/package.json << EOL
 }
 EOL
 
-# 验证 package.json 是否创建成功
-if [ ! -f "/var/www/food-manage/package.json" ]; then
-    handle_error "package.json 创建失败"
-fi
-echo "package.json 创建成功"
+check_file "package.json"
 
-# 5. 复制项目文件
-echo -e "${GREEN}5. 复制项目文件${NC}"
-for dir in app components types utils; do
-    if [ -d "$dir" ]; then
-        cp -r $dir /var/www/food-manage/ || handle_error "复制 $dir 目录失败"
-        echo "$dir 目录复制成功"
-    else
-        echo "警告: $dir 目录不存在"
-    fi
-done
+# 5. 创建项目结构
+echo -e "${GREEN}5. 创建项目结构${NC}"
+mkdir -p app components types utils || handle_error "创建项目结构失败"
 
-# 6. 创建必要的配置文件
-echo -e "${GREEN}6. 创建配置文件${NC}"
-cat > /var/www/food-manage/next.config.js << EOL
+# 6. 创建基本组件和页面
+echo -e "${GREEN}6. 创建基本组件和页面${NC}"
+cat > app/page.tsx << EOL
+import Link from "next/link"
+
+export default function Home() {
+  return (
+    <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
+      <main className="bg-white rounded-lg shadow-md p-8 w-full max-w-md">
+        <h1 className="text-3xl font-bold text-center mb-8">食材管理系统</h1>
+        <nav className="space-y-4">
+          <Link href="/inventory" className="block">
+            <button className="w-full p-2 text-left hover:bg-gray-100 rounded">
+              📦 库存管理
+            </button>
+          </Link>
+          <Link href="/purchase" className="block">
+            <button className="w-full p-2 text-left hover:bg-gray-100 rounded">
+              🛒 采购管理
+            </button>
+          </Link>
+          <Link href="/usage" className="block">
+            <button className="w-full p-2 text-left hover:bg-gray-100 rounded">
+              🍽️ 领用管理
+            </button>
+          </Link>
+          <Link href="/reports" className="block">
+            <button className="w-full p-2 text-left hover:bg-gray-100 rounded">
+              📊 报表生成
+            </button>
+          </Link>
+        </nav>
+      </main>
+    </div>
+  )
+}
+EOL
+
+# 7. 创建配置文件
+echo -e "${GREEN}7. 创建配置文件${NC}"
+cat > next.config.js << EOL
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
@@ -111,7 +149,7 @@ const nextConfig = {
 module.exports = nextConfig
 EOL
 
-cat > /var/www/food-manage/tsconfig.json << EOL
+cat > tsconfig.json << EOL
 {
   "compilerOptions": {
     "target": "es5",
@@ -141,7 +179,7 @@ cat > /var/www/food-manage/tsconfig.json << EOL
 }
 EOL
 
-cat > /var/www/food-manage/postcss.config.js << EOL
+cat > postcss.config.js << EOL
 module.exports = {
   plugins: {
     tailwindcss: {},
@@ -150,7 +188,7 @@ module.exports = {
 }
 EOL
 
-cat > /var/www/food-manage/tailwind.config.js << EOL
+cat > tailwind.config.js << EOL
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   content: [
@@ -165,9 +203,8 @@ module.exports = {
 }
 EOL
 
-# 7. 安装依赖和构建
-echo -e "${GREEN}7. 安装依赖和构建${NC}"
-cd /var/www/food-manage || handle_error "切换到项目目录失败"
+# 8. 安装依赖和构建
+echo -e "${GREEN}8. 安装依赖和构建${NC}"
 echo "当前目录: $(pwd)"
 echo "目录内容:"
 ls -la
@@ -175,8 +212,8 @@ ls -la
 npm install || handle_error "npm install 失败"
 npm run build || handle_error "npm build 失败"
 
-# 8. 配置 Caddy
-echo -e "${GREEN}8. 配置 Caddy${NC}"
+# 9. 配置 Caddy
+echo -e "${GREEN}9. 配置 Caddy${NC}"
 mkdir -p /etc/caddy/Caddyfile.d || handle_error "创建 Caddy 配置目录失败"
 
 cat > /etc/caddy/Caddyfile << EOL
@@ -194,20 +231,19 @@ f.076095598.xyz {
 }
 EOL
 
-# 9. 重载 Caddy 配置
-echo -e "${GREEN}9. 重载 Caddy 配置${NC}"
+# 10. 重载 Caddy 配置
+echo -e "${GREEN}10. 重载 Caddy 配置${NC}"
 systemctl reload caddy || handle_error "Caddy 重载失败"
 
-# 10. 使用 pm2 启动服务
-echo -e "${GREEN}10. 启动服务${NC}"
-cd /var/www/food-manage || handle_error "切换到项目目录失败"
+# 11. 使用 pm2 启动服务
+echo -e "${GREEN}11. 启动服务${NC}"
 pm2 delete food-manage 2>/dev/null || true
 pm2 start npm --name "food-manage" -- start || handle_error "启动服务失败"
 pm2 save || handle_error "保存 pm2 配置失败"
 
-# 11. 设置开机自启
-echo -e "${GREEN}11. 设置开机自启${NC}"
-pm2 startup || handle_error "设置开机自启失败"
+# 12. 设置开机自启
+echo -e "${GREEN}12. 设置开机自启${NC}"
+pm2 startup systemd || handle_error "设置开机自启失败"
 pm2 save || handle_error "保存 pm2 配置失败"
 
 echo -e "${GREEN}部署完成！${NC}"
