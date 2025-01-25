@@ -3,6 +3,7 @@
 # 颜色变量
 GREEN='\033[0;32m'
 RED='\033[0;31m'
+YELLOW='\033[1;33m'
 NC='\033[0m'
 
 # 错误处理函数
@@ -19,11 +20,20 @@ check_file() {
     if [ ! -f "$1" ]; then
         handle_error "文件不存在: $1"
     else
-        echo "文件存在: $1"
-        echo "文件内容:"
+        echo -e "${GREEN}文件存在: $1${NC}"
+        echo -e "${YELLOW}文件内容:${NC}"
         cat "$1"
-        echo "------------------------"
+        echo -e "${YELLOW}------------------------${NC}"
     fi
+}
+
+# 调试信息函数
+debug_info() {
+    echo -e "${YELLOW}调试信息: $1${NC}"
+    echo "当前目录: $(pwd)"
+    echo "目录内容:"
+    ls -la
+    echo -e "${YELLOW}------------------------${NC}"
 }
 
 echo -e "${GREEN}开始部署食材管理系统...${NC}"
@@ -64,10 +74,12 @@ echo -e "${GREEN}3. 创建项目目录${NC}"
 rm -rf /var/www/food-manage
 mkdir -p /var/www/food-manage || handle_error "创建项目目录失败"
 cd /var/www/food-manage || handle_error "切换到项目目录失败"
+debug_info "项目目录创建完成"
 
 # 4. 创建 package.json
 echo -e "${GREEN}4. 创建 package.json${NC}"
-cat > package.json << EOL
+echo "正在创建 package.json..."
+cat > package.json << 'EOL'
 {
   "name": "food-manage",
   "version": "0.1.0",
@@ -94,15 +106,21 @@ cat > package.json << EOL
 }
 EOL
 
+# 验证 package.json 是否创建成功
 check_file "package.json"
+debug_info "package.json 创建完成"
 
 # 5. 创建项目结构
 echo -e "${GREEN}5. 创建项目结构${NC}"
 mkdir -p app components types utils || handle_error "创建项目结构失败"
+debug_info "项目结构创建完成"
 
 # 6. 创建基本组件和页面
 echo -e "${GREEN}6. 创建基本组件和页面${NC}"
-cat > app/layout.tsx << EOL
+
+# 创建 layout.tsx
+echo "创建 app/layout.tsx..."
+cat > app/layout.tsx << 'EOL'
 import './globals.css'
 
 export default function RootLayout({
@@ -117,14 +135,20 @@ export default function RootLayout({
   )
 }
 EOL
+check_file "app/layout.tsx"
 
-cat > app/globals.css << EOL
+# 创建 globals.css
+echo "创建 app/globals.css..."
+cat > app/globals.css << 'EOL'
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 EOL
+check_file "app/globals.css"
 
-cat > app/page.tsx << EOL
+# 创建 page.tsx
+echo "创建 app/page.tsx..."
+cat > app/page.tsx << 'EOL'
 import Link from "next/link"
 
 export default function Home() {
@@ -159,10 +183,14 @@ export default function Home() {
   )
 }
 EOL
+check_file "app/page.tsx"
 
 # 7. 创建配置文件
 echo -e "${GREEN}7. 创建配置文件${NC}"
-cat > next.config.js << EOL
+
+# 创建 next.config.js
+echo "创建 next.config.js..."
+cat > next.config.js << 'EOL'
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
@@ -170,8 +198,11 @@ const nextConfig = {
 }
 module.exports = nextConfig
 EOL
+check_file "next.config.js"
 
-cat > tsconfig.json << EOL
+# 创建 tsconfig.json
+echo "创建 tsconfig.json..."
+cat > tsconfig.json << 'EOL'
 {
   "compilerOptions": {
     "target": "es5",
@@ -200,8 +231,11 @@ cat > tsconfig.json << EOL
   "exclude": ["node_modules"]
 }
 EOL
+check_file "tsconfig.json"
 
-cat > postcss.config.js << EOL
+# 创建 postcss.config.js
+echo "创建 postcss.config.js..."
+cat > postcss.config.js << 'EOL'
 module.exports = {
   plugins: {
     tailwindcss: {},
@@ -209,8 +243,11 @@ module.exports = {
   },
 }
 EOL
+check_file "postcss.config.js"
 
-cat > tailwind.config.js << EOL
+# 创建 tailwind.config.js
+echo "创建 tailwind.config.js..."
+cat > tailwind.config.js << 'EOL'
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   content: [
@@ -224,34 +261,45 @@ module.exports = {
   plugins: [],
 }
 EOL
+check_file "tailwind.config.js"
 
 # 8. 安装依赖和构建
 echo -e "${GREEN}8. 安装依赖和构建${NC}"
-echo "当前目录: $(pwd)"
-echo "目录内容:"
-ls -la
+debug_info "准备安装依赖"
 
+# 再次确认 package.json 存在
+check_file "package.json"
+
+echo "开始安装依赖..."
 npm install || handle_error "npm install 失败"
+debug_info "依赖安装完成"
+
+echo "开始构建项目..."
 npm run build || handle_error "npm build 失败"
+debug_info "项目构建完成"
 
 # 9. 配置 Caddy
 echo -e "${GREEN}9. 配置 Caddy${NC}"
 mkdir -p /etc/caddy/Caddyfile.d || handle_error "创建 Caddy 配置目录失败"
 
-cat > /etc/caddy/Caddyfile << EOL
+echo "创建主 Caddyfile..."
+cat > /etc/caddy/Caddyfile << 'EOL'
 {
     admin off
 }
 
 import /etc/caddy/Caddyfile.d/*
 EOL
+check_file "/etc/caddy/Caddyfile"
 
-cat > /etc/caddy/Caddyfile.d/food.conf << EOL
+echo "创建 food.conf..."
+cat > /etc/caddy/Caddyfile.d/food.conf << 'EOL'
 f.076095598.xyz {
     tls /etc/ssl/web.crt /etc/ssl/web.key
     reverse_proxy localhost:3000
 }
 EOL
+check_file "/etc/caddy/Caddyfile.d/food.conf"
 
 # 10. 重载 Caddy 配置
 echo -e "${GREEN}10. 重载 Caddy 配置${NC}"
@@ -260,6 +308,8 @@ systemctl reload caddy || handle_error "Caddy 重载失败"
 # 11. 使用 pm2 启动服务
 echo -e "${GREEN}11. 启动服务${NC}"
 cd /var/www/food-manage || handle_error "切换到项目目录失败"
+debug_info "准备启动服务"
+
 pm2 delete food-manage 2>/dev/null || true
 pm2 start npm --name "food-manage" -- start || handle_error "启动服务失败"
 pm2 save || handle_error "保存 pm2 配置失败"
