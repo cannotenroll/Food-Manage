@@ -13,19 +13,21 @@ if [ ! -d "$HOME/.nvm" ]; then
     export NVM_DIR="$HOME/.nvm"
     [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
     [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
-    nvm install 18
-    nvm use 18
 else
+    # 确保 nvm 命令可用
+    export NVM_DIR="$HOME/.nvm"
+    [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+    [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
     echo "nvm 已安装"
 fi
 
+# 确保使用正确的 Node.js 版本
+nvm install 18
+nvm use 18
+
 # 2. 安装 pm2
 echo -e "${GREEN}2. 安装 pm2${NC}"
-if ! command -v pm2 &> /dev/null; then
-    npm install -g pm2
-else
-    echo "pm2 已安装"
-fi
+npm install -g pm2
 
 # 3. 创建项目目录
 echo -e "${GREEN}3. 创建项目目录${NC}"
@@ -57,6 +59,7 @@ sudo systemctl reload caddy
 
 # 8. 使用 pm2 启动服务
 echo -e "${GREEN}8. 启动服务${NC}"
+export PATH=$PATH:/home/$USER/.nvm/versions/node/v18/bin
 pm2 delete food-manage 2>/dev/null || true
 pm2 start npm --name "food-manage" -- start
 pm2 save
