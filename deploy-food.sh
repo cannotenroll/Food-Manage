@@ -17,14 +17,26 @@ handle_error() {
 
 # 检查文件是否存在
 check_file() {
-    if [ ! -f "$1" ]; then
-        handle_error "文件不存在: $1"
-    else
-        echo -e "${GREEN}文件存在: $1${NC}"
-        echo -e "${YELLOW}文件内容:${NC}"
-        cat "$1"
-        echo -e "${YELLOW}------------------------${NC}"
-    fi
+    local file="$1"
+    local retries=3
+    local wait=1
+    
+    while [ $retries -gt 0 ]; do
+        if [ -f "$file" ]; then
+            echo -e "${GREEN}文件存在: $file${NC}"
+            echo -e "${YELLOW}文件内容:${NC}"
+            cat "$file"
+            echo -e "${YELLOW}------------------------${NC}"
+            sync  # 同步文件系统
+            return 0
+        else
+            echo -e "${YELLOW}等待文件创建: $file (剩余尝试次数: $retries)${NC}"
+            sleep $wait
+            retries=$((retries-1))
+        fi
+    done
+    
+    handle_error "文件不存在: $file"
 }
 
 # 调试信息函数
@@ -34,6 +46,18 @@ debug_info() {
     echo "目录内容:"
     ls -la
     echo -e "${YELLOW}------------------------${NC}"
+}
+
+# 创建文件函数
+create_file() {
+    local file="$1"
+    local content="$2"
+    
+    echo "创建文件: $file"
+    mkdir -p "$(dirname "$file")"  # 确保父目录存在
+    echo "$content" > "$file"
+    sync  # 同步文件系统
+    check_file "$file"
 }
 
 echo -e "${GREEN}开始部署食材管理系统...${NC}"
@@ -78,9 +102,7 @@ debug_info "项目目录创建完成"
 
 # 4. 创建 package.json
 echo -e "${GREEN}4. 创建 package.json${NC}"
-echo "正在创建 package.json..."
-cat > package.json << 'EOL'
-{
+create_file "package.json" '{
   "name": "food-manage",
   "version": "0.1.0",
   "private": true,
@@ -103,12 +125,7 @@ cat > package.json << 'EOL'
     "tailwindcss": "^3.3.0",
     "typescript": "^5.0.0"
   }
-}
-EOL
-
-# 验证 package.json 是否创建成功
-check_file "package.json"
-debug_info "package.json 创建完成"
+}'
 
 # 5. 创建项目结构
 echo -e "${GREEN}5. 创建项目结构${NC}"
@@ -119,9 +136,7 @@ debug_info "项目结构创建完成"
 echo -e "${GREEN}6. 创建基本组件和页面${NC}"
 
 # 创建 layout.tsx
-echo "创建 app/layout.tsx..."
-cat > app/layout.tsx << 'EOL'
-import './globals.css'
+create_file "app/layout.tsx" 'import "./globals.css"
 
 export default function RootLayout({
   children,
@@ -133,23 +148,15 @@ export default function RootLayout({
       <body>{children}</body>
     </html>
   )
-}
-EOL
-check_file "app/layout.tsx"
+}'
 
 # 创建 globals.css
-echo "创建 app/globals.css..."
-cat > app/globals.css << 'EOL'
-@tailwind base;
+create_file "app/globals.css" '@tailwind base;
 @tailwind components;
-@tailwind utilities;
-EOL
-check_file "app/globals.css"
+@tailwind utilities;'
 
 # 创建 page.tsx
-echo "创建 app/page.tsx..."
-cat > app/page.tsx << 'EOL'
-import Link from "next/link"
+create_file "app/page.tsx" 'import Link from "next/link"
 
 export default function Home() {
   return (
@@ -181,29 +188,21 @@ export default function Home() {
       </main>
     </div>
   )
-}
-EOL
-check_file "app/page.tsx"
+}'
 
 # 7. 创建配置文件
 echo -e "${GREEN}7. 创建配置文件${NC}"
 
 # 创建 next.config.js
-echo "创建 next.config.js..."
-cat > next.config.js << 'EOL'
-/** @type {import('next').NextConfig} */
+create_file "next.config.js" '/** @type {import("next").NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  output: 'standalone'
+  output: "standalone"
 }
-module.exports = nextConfig
-EOL
-check_file "next.config.js"
+module.exports = nextConfig'
 
 # 创建 tsconfig.json
-echo "创建 tsconfig.json..."
-cat > tsconfig.json << 'EOL'
-{
+create_file "tsconfig.json" '{
   "compilerOptions": {
     "target": "es5",
     "lib": ["dom", "dom.iterable", "esnext"],
@@ -229,39 +228,29 @@ cat > tsconfig.json << 'EOL'
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
   "exclude": ["node_modules"]
-}
-EOL
-check_file "tsconfig.json"
+}'
 
 # 创建 postcss.config.js
-echo "创建 postcss.config.js..."
-cat > postcss.config.js << 'EOL'
-module.exports = {
+create_file "postcss.config.js" 'module.exports = {
   plugins: {
     tailwindcss: {},
     autoprefixer: {},
   },
-}
-EOL
-check_file "postcss.config.js"
+}'
 
 # 创建 tailwind.config.js
-echo "创建 tailwind.config.js..."
-cat > tailwind.config.js << 'EOL'
-/** @type {import('tailwindcss').Config} */
+create_file "tailwind.config.js" '/** @type {import("tailwindcss").Config} */
 module.exports = {
   content: [
-    './pages/**/*.{js,ts,jsx,tsx,mdx}',
-    './components/**/*.{js,ts,jsx,tsx,mdx}',
-    './app/**/*.{js,ts,jsx,tsx,mdx}',
+    "./pages/**/*.{js,ts,jsx,tsx,mdx}",
+    "./components/**/*.{js,ts,jsx,tsx,mdx}",
+    "./app/**/*.{js,ts,jsx,tsx,mdx}",
   ],
   theme: {
     extend: {},
   },
   plugins: [],
-}
-EOL
-check_file "tailwind.config.js"
+}'
 
 # 8. 安装依赖和构建
 echo -e "${GREEN}8. 安装依赖和构建${NC}"
@@ -280,26 +269,16 @@ debug_info "项目构建完成"
 
 # 9. 配置 Caddy
 echo -e "${GREEN}9. 配置 Caddy${NC}"
-mkdir -p /etc/caddy/Caddyfile.d || handle_error "创建 Caddy 配置目录失败"
 
-echo "创建主 Caddyfile..."
-cat > /etc/caddy/Caddyfile << 'EOL'
-{
-    admin off
-}
-
-import /etc/caddy/Caddyfile.d/*
-EOL
-check_file "/etc/caddy/Caddyfile"
-
-echo "创建 food.conf..."
-cat > /etc/caddy/Caddyfile.d/food.conf << 'EOL'
-f.076095598.xyz {
+# 创建 Caddyfile
+create_file "/etc/caddy/Caddyfile" 'f.076095598.xyz {
     tls /etc/ssl/web.crt /etc/ssl/web.key
     reverse_proxy localhost:3000
-}
-EOL
-check_file "/etc/caddy/Caddyfile.d/food.conf"
+}'
+
+# 验证 Caddy 配置
+echo "验证 Caddy 配置..."
+caddy validate --config /etc/caddy/Caddyfile || handle_error "Caddy 配置验证失败"
 
 # 10. 重载 Caddy 配置
 echo -e "${GREEN}10. 重载 Caddy 配置${NC}"
@@ -316,7 +295,7 @@ pm2 save || handle_error "保存 pm2 配置失败"
 
 # 12. 设置开机自启
 echo -e "${GREEN}12. 设置开机自启${NC}"
-pm2 startup || true
+pm2 startup systemd || true
 pm2 save || handle_error "保存 pm2 配置失败"
 
 echo -e "${GREEN}部署完成！${NC}"
